@@ -1,0 +1,93 @@
+// Initialize Variables
+LET vFilePath   = 'lib://Data_' & 'Sep' & '.qvd';
+LET vToday      = Date(Today(), 'YYYY-MM-DD');
+LET vStartDate  = Date('2024-9-1', 'YYYY-MM-DD'); 
+LET vEndDate    = Date('2025-1-1', 'YYYY-MM-DD'); 
+
+// Check if QVD file exists
+IF FileSize('$(vFilePath)') > 0 THEN
+
+    Temp_MaxDate:
+    LOAD 
+        Max(DATE(FIELD_CLOSE_TIME)) AS MAX_CLOSE_DATE
+    FROM [$(vFilePath)] (qvd);
+    LET vMaxDate = Date(Peek('MAX_CLOSE_DATE', 0, 'Temp_MaxDate'), 'YYYY-MM-DD');  
+    DROP TABLE Temp_MaxDate;
+
+    DATA_MAIN:
+    LOAD   
+        *  
+    FROM [$(vFilePath)] (qvd)
+    WHERE DATE(FIELD_CLOSE_TIME) > '$(vStartDate)'
+    AND DATE(FIELD_CLOSE_TIME) < '$(vEndDate)'
+    AND FIELD_BRAND <> ...
+    AND NOT WildMatch(FIELD_BRAND, '*Profile picture of*', '*profile picture*','*profile*');
+
+    TRACE 'Data loaded from QVD: $(vFilePath)';
+
+    IF '$(vMaxDate)' <= '$(vEndDate)' THEN
+        LIB CONNECT TO 'P&G AdView:Oracle_162.62.132.10';
+        Incremental_Data:
+        SELECT 
+            *
+            SUBSTR("MEDIA_USER_SESSION", 1, 8) AS FIELD_USER_ID
+        FROM "A1"."A2"
+        WHERE "MEDIA_CLOSE_TIME" > TO_DATE('$(vMaxDate)', 'YYYY-MM-DD') + 1
+        AND "MEDIA_CLOSE_TIME" < TO_DATE('$(vEndDate)', 'YYYY-MM-DD');
+
+        LET vRowCount = NoOfRows('Incremental_Data');
+        TRACE 'Latest Date in QVD is: $(vMaxDate)';
+        TRACE 'Length of Incremental Data is: $(vRowCount)';
+
+        IF NoOfRows('Incremental_Data') > 0 THEN
+            CONCATENATE (DATA_MAIN)
+            LOAD * RESIDENT Incremental_Data;
+            DROP TABLE Incremental_Data;
+        ELSE
+            TRACE 'No new data to concatenate from the database.';
+        ENDIF
+
+    ELSE
+        TRACE 'No new data to load from the database as the latest date in QVD is: $(vMaxDate)';
+    ENDIF
+
+ELSE
+    LIB CONNECT TO 'DataBase';
+    DATA_MAIN:
+    SELECT 
+        *
+        SUBSTR("MEDIA_USER_SESSION", 1, 8) AS FIELD_USER_ID
+    FROM 	"A1"."A2"
+    WHERE 	"MEDIA_CLOSE_TIME" > TO_DATE('$(vStartDate)', 'YYYY-MM-DD')
+    AND 	"MEDIA_CLOSE_TIME" < TO_DATE('$(vEndDate)', 'YYYY-MM-DD');
+
+ENDIF
+
+LET vRowCount = NoOfRows('DATA_MAIN');
+TRACE 'Number of rows loaded: ' & [$(vRowCount)];
+STORE DATA_MAIN INTO [$(vFilePath)] (qvd);
+TRACE 'Data loaded and saved as QVD: [$(vFilePath)]';
+
+
+
+//User Info Table
+User_Table:
+LOAD
+    TRIM("Users")		AS TAG_USER_ID				,
+    "QuickBackup"		AS Info_Quick_ID			,
+    "GoogleID(email)" 		AS Info_Google_ID			,
+    "Group"			AS Info_Gender_Age			,
+    "Script"			As Info_Actively_Considering		,
+    Search_Frequency		As Info_Actively_Considering		,
+    "ad"			AS Info_Ad_Blocker			, 
+    "video"			AS Info_Video				,
+    "region"			AS Info_Region				,
+    Shutdown			AS Info_Shutdown			,
+    Skip_Behavior		AS Info_Skip_Behavior			,
+    Orientation			AS Info_Orientation			,
+    Search_Frequency		AS Info_Search_Frequency		,
+    SYS_Model			AS Info_SYS_Model			,
+    SYS_Version			AS Info_SYS_Version			,
+    DeviceID			AS Info_Device
+FROM [lib://User_Table.xlsx]
+(ooxml, embedded labels, table is [Ad]);

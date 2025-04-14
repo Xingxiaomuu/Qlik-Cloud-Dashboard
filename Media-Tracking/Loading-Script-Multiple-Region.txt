@@ -1,0 +1,181 @@
+// 初始化变量
+LET vFilePath      = 'lib://DataFiles/Data_Quick/Data_Adview_Index.qvd'; // 合并数据的保存路径
+LET vStartDate     = Date('2024-09-01', 'YYYY-MM-DD'); //（含）
+//LET vEndDate       = Date('2024-09-31', 'YYYY-MM-DD'); //（不含）
+LET vEndDate       = Date(Today()+1, 'YYYY-MM-DD');      //（不含）
+LET vToday         = Date(Today(), 'YYYY-MM-DD');
+
+// Check if QVD file exists
+IF FileSize('$(vFilePath)') > 0 THEN
+
+    // Load QVD and get the latest TAG_MEDIA_CLOSE_TIME
+    Temp_MaxDate:
+    LOAD 
+        Max(DATE(Field_Close_Time)) AS MAX_FIELD_CLOSE_DATE
+    FROM [$(vFilePath)] (qvd);
+    LET vMaxDate = Date(Peek('MAX_FIELD_CLOSE_DATE', 0, 'Temp_MaxDate'), 'YYYY-MM-DD');
+    DROP TABLE Temp_MaxDate;
+
+    // Load all data from QVD
+    Masked_Table:
+    LOAD 	
+        *
+    FROM [$(vFilePath)] (qvd)
+    WHERE 
+        DATE(Field_Close_Time) > '$(vStartDate)'
+        AND DATE(Field_Close_Time) < '$(vEndDate)'
+        AND Media_Name  <> ''
+        AND Media_Name  <> ' '
+        AND Brand_Name  <> ''
+        AND Brand_Name  <> ' '
+        AND Brand_Name  <> 'Unknown'
+        AND Brand_Name  <> 'Visit Advertiser'
+        AND Brand_Name  <> 'Skip Ad'
+        AND Ad_Title <> 'Clear Current Search Text'
+        AND NOT WildMatch(Brand_Name, '*Profile Picture*');
+    
+    TRACE 'Data loaded from QVD: $(vFilePath)';
+
+    // Check if incremental load is needed
+    IF '$(vMaxDate)' <= '$(vEndDate)' THEN  
+
+        // Load from the first Oracle database
+        LIB CONNECT TO 'AdView:Oracle_Connection';
+        Incremental_Data_1:
+        SELECT 
+            "Device_ID"             AS Masked_Device_ID,
+            "Media_Type"            AS Masked_Media_Type,
+            "Session_ID"            AS Masked_Session_ID,
+            "Open_Time"             AS Masked_Open_Time,
+            "Close_Time"            AS Masked_Close_Time,
+            "Stay_Time"             AS Masked_Stay_Time,
+            "Exposure_Start_Time"   AS Masked_Exposure_Start_Time,
+            "Exposure_End_Time"     AS Masked_Exposure_End_Time,
+            "Advertiser"            AS Masked_Advertiser,
+            "Brand"                 AS Masked_Brand,
+            "Campaign_Content"      AS Masked_Campaign_Content,
+            "Ad_Type"               AS Masked_Ad_Type,
+            "Ad_Class"              AS Masked_Ad_Class,
+            "Ad_Order"              AS Masked_Ad_Order,
+            "Ad_Title"              AS Masked_Ad_Title,
+            SUBSTR("Session_ID", 1, 8) AS Masked_User_ID
+        FROM "AdViewDB"."Ad_Detail_Table"
+        WHERE "Close_Time" > TO_DATE('$(vMaxDate)', 'YYYY-MM-DD') + 1
+          AND "Close_Time" < TO_DATE('$(vEndDate)', 'YYYY-MM-DD')
+          AND "Advertiser" IN (       
+           'Brand_A'	,
+           'Brand_B'	,
+           'Brand_C'	,
+           'Brand_D'	);
+
+        // Load from the second Oracle database
+        LIB CONNECT TO 'AdView:Oracle_Connection';
+        Incremental_Data_2:
+        SELECT 
+            "Device_ID"             AS Masked_Device_ID,
+            "Media_Type"            AS Masked_Media_Type,
+            "Session_ID"            AS Masked_Session_ID,
+            "Open_Time"             AS Masked_Open_Time,
+            "Close_Time"            AS Masked_Close_Time,
+            "Stay_Time"             AS Masked_Stay_Time,
+            "Exposure_Start_Time"   AS Masked_Exposure_Start_Time,
+            "Exposure_End_Time"     AS Masked_Exposure_End_Time,
+            "Advertiser"            AS Masked_Advertiser,
+            "Brand"                 AS Masked_Brand,
+            "Campaign_Content"      AS Masked_Campaign_Content,
+            "Ad_Type"               AS Masked_Ad_Type,
+            "Ad_Class"              AS Masked_Ad_Class,
+            "Ad_Order"              AS Masked_Ad_Order,
+            "Ad_Title"              AS Masked_Ad_Title,
+            SUBSTR("Session_ID", 1, 8) AS Masked_User_ID
+        FROM "AdViewDB"."Ad_Additional_Table"
+        WHERE "Close_Time" > TO_DATE('$(vMaxDate)', 'YYYY-MM-DD') + 1
+          AND "Close_Time" < TO_DATE('$(vEndDate)', 'YYYY-MM-DD')
+          AND "Advertiser" IN (       
+           'Brand_E'				,
+           'Brand_F'				,
+           'Brand_G'				,
+           'Brand_H'				,
+           'Brand_I'				);
+
+        // Concatenate the data
+        IF NoOfRows('Incremental_Data_1') > 0 THEN
+            CONCATENATE (Masked_Table)
+            LOAD * RESIDENT Incremental_Data_1;
+            DROP TABLE Incremental_Data_1;
+        ENDIF
+
+        IF NoOfRows('Incremental_Data_2') > 0 THEN
+            CONCATENATE (Masked_Table)
+            LOAD * RESIDENT Incremental_Data_2;
+            DROP TABLE Incremental_Data_2;
+        ENDIF
+
+    ELSE
+        TRACE 'No new data to load as the latest date in QVD is: $(vMaxDate)';
+    ENDIF
+
+ELSE
+    // If QVD file does not exist, load all data from both databases
+    LIB CONNECT TO 'AdView:Oracle_Connection';
+    Masked_Table:
+    SELECT 
+        "Device_ID"             AS Masked_Device_ID,
+        "Media_Type"            AS Masked_Media_Type,
+        "Session_ID"            AS Masked_Session_ID,
+        "Open_Time"             AS Masked_Open_Time,
+        "Close_Time"            AS Masked_Close_Time,
+        "Stay_Time"             AS Masked_Stay_Time,
+        "Exposure_Start_Time"   AS Masked_Exposure_Start_Time,
+        "Exposure_End_Time"     AS Masked_Exposure_End_Time,
+        "Advertiser"            AS Masked_Advertiser,
+        "Brand"                 AS Masked_Brand,
+        "Campaign_Content"      AS Masked_Campaign_Content,
+        "Ad_Type"               AS Masked_Ad_Type,
+        "Ad_Class"              AS Masked_Ad_Class,  // 4 Class
+        "Ad_Order"              AS Masked_Ad_Order,  // Order
+        "Ad_Title"              AS Masked_Ad_Title,  // Title 
+        SUBSTR("Session_ID", 1, 8) AS Masked_User_ID
+    FROM "AdViewDB"."Ad_Detail_Table"
+    WHERE "Close_Time" > TO_DATE('$(vStartDate)', 'YYYY-MM-DD')
+      AND "Close_Time" < TO_DATE('$(vEndDate)', 'YYYY-MM-DD')
+      AND "Advertiser" IN (       
+           'Brand_A'	,
+           'Brand_B'	,
+           'Brand_C'	,
+           'Brand_D'	);
+
+    LIB CONNECT TO 'AdView:Oracle_Connection';
+    CONCATENATE (Masked_Table)
+    SELECT 
+        "Device_ID"             AS Masked_Device_ID,
+        "Media_Type"            AS Masked_Media_Type,
+        "Session_ID"            AS Masked_Session_ID,
+        "Open_Time"             AS Masked_Open_Time,
+        "Close_Time"            AS Masked_Close_Time,
+        "Stay_Time"             AS Masked_Stay_Time,
+        "Exposure_Start_Time"   AS Masked_Exposure_Start_Time,
+        "Exposure_End_Time"     AS Masked_Exposure_End_Time,
+        "Advertiser"            AS Masked_Advertiser,
+        "Brand"                 AS Masked_Brand,
+        "Campaign_Content"      AS Masked_Campaign_Content,
+        "Ad_Type"               AS Masked_Ad_Type,
+        "Ad_Class"              AS Masked_Ad_Class,  // 4 Class
+        "Ad_Order"              AS Masked_Ad_Order,  // Order
+        "Ad_Title"              AS Masked_Ad_Title,  // Title
+        SUBSTR("Session_ID", 1, 8) AS Masked_User_ID
+    FROM "AdViewDB"."Ad_Additional_Table"
+    WHERE "Close_Time" > TO_DATE('$(vStartDate)', 'YYYY-MM-DD')
+      AND "Close_Time" < TO_DATE('$(vEndDate)', 'YYYY-MM-DD')
+      AND "Advertiser" IN (       
+           'Brand_E'				,
+           'Brand_F'				,
+           'Brand_G'				,
+           'Brand_H'				,
+           'Brand_I'				);
+
+ENDIF
+
+// Save the updated data as QVD
+STORE Masked_Table INTO [$(vFilePath)] (qvd);
+TRACE 'Data loaded and saved as QVD: [$(vFilePath)]';
