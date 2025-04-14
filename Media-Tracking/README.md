@@ -86,24 +86,22 @@ Sample user profile filter includes ads with class in 'Premium' or 'Video', ad t
 
 ## 🧠 Constraints  
 
-- **Temporal Scope**: Default analysis range is 2024-09-04 to 2024-10-04  
-- **File Partitioning**: QVD files are monthly segmented  
-- **Data Quality**: Blank brands are invalid; short session IDs treated as test data  
-- **System Config**: Oracle uses read replica; QlikView script scheduled daily at 02:00 GMT+8  
+- **Temporal Scope**: Default analysis range is 2024-09-04 to 2024-12-30 (Quarterly tracking phase)  
+- **File Partitioning**: QVD files can be monthly segmented  
+- **Data Quality**: Blank brands are invalid; short session IDs treated and filtered as test data  
+- **Automation**: Oracle uses read replica; QlikView script scheduled daily at 02:00 GMT+8  
 
 ---
 
 This documentation combines technical implementation details with business context for both developer and analyst audiences. Adjust connection strings and date ranges as needed for your environment.
 
-# Data Masking Overview
-
-## Project Overview
-
-This dataset contains information related to user behavior, including interactions with advertisements and video content. The data has been processed to ensure that sensitive personal information is protected by anonymizing or masking identifiable fields.
-
 ---
 
-## Data Structure
+## User Pretrain Profile Data Joining 
+
+This dataset contains information related to user behavior, including interactions with advertisements and video content. 
+
+---
 
 ### Source Systems
 1. **Google Drive File**: Data loaded from the provided Excel file hosted on Google Drive.
@@ -111,32 +109,28 @@ This dataset contains information related to user behavior, including interactio
 
 ### Core Fields
 
-| Original Field         | Masked Qlik Field        | Description                   |
+| Original Field         | Qlik Field               | Description                   |
 |------------------------|--------------------------|-------------------------------|
 | Users                  | TAG_USER_ID              | Anonymized user ID            |
-| QuickBackup            | Info_Quick_ID            | User backup information       |
-| GoogleID(email)        | Info_Google_ID           | Anonymized Google email       |
-| Group                  | Info_Gender_Age          | Generalized demographic group |
-| Script                 | Info_Actively_Considering | Ad interaction status         |
-| ad                     | Info_Ad_Blocker          | Indicates ad blocker usage    |
-| video                  | Info_Video               | Video interaction behavior    |
-| region                 | Info_Region              | Geographical region data      |
-| Skip_Behavior          | Info_Skip_Behavior       | Behavior related to ad skipping |
-| SYS_Model              | Info_SYS_Model           | System model identifier       |
-| SYS_Version            | Info_SYS_Version         | System version information    |
-| DeviceID               | Info_Device              | Anonymized device identifier  |
+| Backup                 | Info_ID                  | User backup information       |
+| ...                    | ...                      | ...                           |
+| Behaviors              | ...                      | Behavior related to ad        |
+| Model                  | ...                      | System model identifier       |
+| Version                | ...                      | System version information    |
+| DeviceID               | ...                      | Anonymized device identifier  |
 
 ---
 
 ## Data Masking & Anonymization
 
 The data provided contains several fields that were masked or anonymized for privacy reasons:
-- **Email and DeviceID**: These fields have been anonymized to avoid direct personal identification.  
+- **Email and DeviceID**: These fields are user personal identification.  
 - **User Identifiers**: Any personal information related to users has been anonymized or generalized (e.g., **Users** field).
-- **Demographic Data**: Group information is generalized to **Info_Gender_Age** to avoid exposing sensitive demographic details.
+- **Demographic Data**: Group information is generalized to **Info_** to avoid exposing sensitive demographic details. 
+- **Behavior Settings**: Group information is generalized to **Behaviors_** to avoid exposing sensitive demographic details. Containing business requirement on user-searching and user-watching behavior based on panel structure.
 
 ---
 
 ## Notes
-- Please ensure that all sensitive fields are properly masked before sharing or storing the data.
-- The data transformation steps and the corresponding anonymized fields will allow for meaningful analysis without exposing personal details.
+- All sensitive fields are masked before sharing or storing the data.
+- The data transformation steps and the corresponding anonymized fields will allow for meaningful analysis.
