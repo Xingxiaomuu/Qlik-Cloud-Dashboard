@@ -1,0 +1,4 @@
+LOAD
+	*
+FROM [lib://DataFiles/EC_Index_2000.xlsx]
+(ooxml, no labels, table is 完整数据源);
