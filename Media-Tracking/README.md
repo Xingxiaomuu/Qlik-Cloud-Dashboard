@@ -8,8 +8,8 @@
 - Compare cross-platform metrics (impressions, engagement, etc.)  
 - Identify emerging patterns through continuous monitoring  
 - Support data-driven media buying decisions  
-![QlikView Interactive Dashboard](./Qlik-Dashboard-Monitoring.png)
-
+![QlikView Interactive Aggregated Dashboard](./Qlik-Dashboard-Aggregated.png)
+![QlikView Interactive Individual Dashboard](./Qlik-Dashboard-Individual.png)
 ---
 
 ## 🗂️ Data Structure  
@@ -121,7 +121,7 @@ This dataset contains information related to user behavior, including interactio
 
 ---
 
-## Data Masking & Anonymization
+### Data Masking & Anonymization
 
 The data provided contains several fields that were masked or anonymized for privacy reasons:
 - **Email and DeviceID**: These fields are user personal identification.  
@@ -131,6 +131,6 @@ The data provided contains several fields that were masked or anonymized for pri
 
 ---
 
-## Notes
+### Notes
 - All sensitive fields are masked before sharing or storing the data.
 - The data transformation steps and the corresponding anonymized fields will allow for meaningful analysis.
