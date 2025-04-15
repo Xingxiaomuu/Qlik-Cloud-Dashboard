@@ -1,0 +1,98 @@
+// Connect to database
+LIB CONNECT TO 'KOL';
+
+// Load VM Reporting Data
+LOAD 
+    MARKET          AS MARKET_CODE,
+    PROFILE_URL     AS USER_PROFILE_LINK,
+    KOL_NAME        AS USER_ALIAS,
+    ORIGINAL_POST   AS POST_ORIGIN,
+    CASE_SUMMARY    AS POST_SUMMARY,
+    POST_TIME       AS POST_TIMESTAMP,
+    KEYWORD         AS POST_KEYWORD,
+    VM_RISK_LEVEL   AS RISK_LEVEL,
+    RISK_CATEGORY   AS RISK_TYPE,
+    LINK_ADDR       AS EXTERNAL_LINK,
+    REMARK          AS SYSTEM_NOTE,
+    KOL_DETAILS     AS USER_DESCRIPTION;
+
+[KOL_VM_REPORT]:
+SELECT 
+    "MARKET",
+    "PROFILE_URL",
+    "KOL_NAME",
+    "ORIGINAL_POST",
+    "CASE_SUMMARY",
+    "POST_TIME",
+    "KEYWORD",
+    "VM_RISK_LEVEL",
+    "RISK_CATEGORY",
+    "LINK_ADDR",
+    "REMARK",
+    "KOL_DETAILS"
+FROM "KOL_INDEX"."KOL_INDEX_VM_REPORTING";
+
+// Load Profile Data
+LOAD 
+    KOL_NUM         AS USER_ID,
+    MARKET          AS MARKET_CODE,
+    BRAND           AS BRAND_NAME,
+    KOL_NAME        AS USER_ALIAS,
+    GENDER          AS USER_GENDER,
+    ACTIVATION_TYPE AS ACCOUNT_TYPE,
+    PROFILE_TIER    AS ACCOUNT_TIER,
+    PROFILE_URL     AS USER_PROFILE_LINK,
+    IMAGE           AS PROFILE_IMAGE;
+
+[USER_PROFILE]:
+SELECT 
+    "KOL_NUM",
+    "MARKET",
+    "BRAND",
+    "KOL_NAME",
+    "GENDER",
+    "ACTIVATION_TYPE",
+    "PROFILE_TIER",
+    "PROFILE_URL",
+    "IMAGE"
+FROM "KOL_INDEX"."KOL_PROFILE";
+
+// Count unique users in JP market
+PopJP:
+LOAD 
+    Count(DISTINCT USER_ALIAS) AS POPULATION_JP
+Resident [USER_PROFILE]
+Where MARKET_CODE = 'JP';
+
+LET vPopulation_JP = Peek('POPULATION_JP', 0, 'PopJP');
+DROP Table PopJP;
+
+// Count unique users in TW market
+PopTW:
+LOAD 
+    Count(DISTINCT USER_ALIAS) AS POPULATION_TW
+Resident [USER_PROFILE]
+Where MARKET_CODE = 'TW';
+
+LET vPopulation_TW = Peek('POPULATION_TW', 0, 'PopTW');
+DROP Table PopTW;
+
+// Count male users
+PopMale:
+LOAD 
+    Count(DISTINCT USER_ALIAS) AS POPULATION_MALE
+Resident [USER_PROFILE]
+Where USER_GENDER = 'M';
+
+LET vPopulation_M = Peek('POPULATION_MALE', 0, 'PopMale');
+DROP Table PopMale;
+
+// Count female users
+PopFemale:
+LOAD 
+    Count(DISTINCT USER_ALIAS) AS POPULATION_FEMALE
+Resident [USER_PROFILE]
+Where USER_GENDER = 'F';
+
+LET vPopulation_F = Peek('POPULATION_FEMALE', 0, 'PopFemale');
+DROP Table PopFemale;
